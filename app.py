@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-OLLAMA_API_URL = "http://192.168.0.211:11434/api/chat"
-TIKA_API_URL = "http://192.168.0.211:9998/tika"
-MODEL_NAME = "codellama"
+OLLAMA_API_URL = "http://localhost:11434/api/chat"
+TIKA_API_URL = "http://localhost:9998/tika"
+MODEL_NAME = "mistral" #change to the model that you wish to use
 
 # GPU and model configurations
 MODEL_CONFIG = {
@@ -20,9 +20,9 @@ MODEL_CONFIG = {
     "top_k": 40,
     "top_p": 0.9,
     "num_ctx": 4096,
-    "num_gpu": 1,
-    "num_thread": 56,
-    "gpu_layers": 80
+    "num_gpu": 1, # change to your # of GPUs
+    "num_thread": 8,
+    "gpu_layers": 35
 }
 
 # Store conversation and document data
