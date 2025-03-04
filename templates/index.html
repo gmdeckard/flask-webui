@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLMChat</title>
+    <style>
+        body {
+            background-color: #555;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .page-title {
+            font-size: 2.5em;
+            color: #fff;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .icon {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .icon img {
+            width: 10vw;
+            height: auto;
+        }
+
+        .chat-container {
+            flex-grow: 1;
+            background-color: #333;
+            border-radius: 12px;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 60vh;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+        }
+
+        .chat-message {
+            max-width: 75%;
+            padding: 12px 16px;
+            border-radius: 20px;
+            margin: 4px 0;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background-color: #007AFF;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 5px;
+        }
+
+        .assistant-message {
+            background-color: #333333;
+            color: white;
+            align-self: flex-start;
+            border-bottom-left-radius: 5px;
+        }
+
+        .system-message {
+            background-color: #1a1a1a;
+            color: #888888;
+            align-self: center;
+            font-size: 0.9em;
+            padding: 8px 12px;
+            border-radius: 10px;
+        }
+
+        .drop-zone {
+            border: 2px dashed #000;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .drop-zone.dragover {
+            border-color: #000;
+            background-color: rgba(0, 122, 255, 0.1);
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            background-color: #1a1a1a;
+            border-radius: 12px;
+        }
+
+        .input-box {
+            flex-grow: 1;
+            background-color: #333333;
+            color: white;
+            padding: 12px;
+            border-radius: 20px;
+            min-height: 24px;
+            max-height: 150px;
+            overflow-y: auto;
+            outline: none;
+        }
+
+        .send-button {
+            background-color: #007AFF;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .new-chat-button {
+            background-color: #333;
+            color: white;
+            padding: 8px 16px;
+            border: 1px solid #555;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .new-chat-button:hover {
+            background-color: #444;
+            border-color: #666;
+        }
+
+        .markdown-content pre {
+            background-color: #1a1a1a;
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .markdown-content code {
+            font-family: 'Menlo', monospace;
+            font-size: 14px;
+        }
+
+        .loading-dots {
+            display: inline-block;
+        }
+        .loading-dots span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            margin-right: 3px;
+            background-color: #333;
+            border-radius: 50%;
+            animation: loading 1s infinite;
+        }
+        .loading-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .loading-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes loading {
+            0% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+            100% {
+                transform: translateY(0);
+            }
+        }
+    </style>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            marked.setOptions({
+                highlight: function(code, lang) {
+                    if (lang && hljs.getLanguage(lang)) {
+                        return hljs.highlight(code, { language: lang }).value;
+                    }
+                    return code;
+                }
+            });
+
+            let previousInput = '';
+
+            function handleFileSelect(event) {
+                const files = event.target.files || event.dataTransfer.files;
+                if (!files.length) return;
+                uploadFiles(files);
+            }
+
+            function uploadFiles(files) {
+                const formData = new FormData();
+                for (const file of files) {
+                    formData.append('files', file);
+                }
+
+                addMessageToChat('system', 'Processing documents...');
+
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        addMessageToChat('system', `Error: ${data.error}`);
+                    } else {
+                        addMessageToChat('system', data.message);
+                    }
+                })
+                .catch(error => {
+                    addMessageToChat('system', `Error: ${error.message}`);
+                });
+            }
+
+            function addMessageToChat(role, content) {
+                const chatContainer = document.getElementById('chatContainer');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `chat-message ${role}-message`;
+                
+                if (role === 'assistant') {
+                    const markdownContent = marked.parse(content);
+                    messageDiv.innerHTML = markdownContent;
+                    messageDiv.classList.add('markdown-content');
+                } else {
+                    messageDiv.textContent = content;
+                }
+                
+                chatContainer.appendChild(messageDiv);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+                
+                if (role === 'assistant') {
+                    messageDiv.querySelectorAll('pre code').forEach((block) => {
+                        hljs.highlightBlock(block);
+                    });
+                }
+            }
+
+            function sendMessage() {
+                const userInput = document.getElementById('userInput');
+                const message = userInput.innerText.trim();
+                
+                if (!message) return;
+
+                previousInput = message;
+                addMessageToChat('user', message);
+                userInput.innerText = '';
+
+                const loadingBubble = document.createElement('div');
+                loadingBubble.className = 'chat-message assistant-message';
+                loadingBubble.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
+                document.getElementById('chatContainer').appendChild(loadingBubble);
+                document.getElementById('chatContainer').scrollTop = document.getElementById('chatContainer').scrollHeight;
+
+                fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('chatContainer').removeChild(loadingBubble);
+                    if (data.error) {
+                        addMessageToChat('system', `Error: ${data.error}`);
+                    } else {
+                        addMessageToChat('assistant', data.response);
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('chatContainer').removeChild(loadingBubble);
+                    addMessageToChat('system', `Error: ${error.message}`);
+                });
+            }
+
+            function startNewChat() {
+                document.getElementById('chatContainer').innerHTML = '';
+                document.getElementById('userInput').innerText = '';
+                
+                fetch('/reset', {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        addMessageToChat('system', 'Started new chat session');
+                    }
+                })
+                .catch(error => {
+                    addMessageToChat('system', 'Error starting new chat');
+                });
+            }
+
+            // Event listeners
+            document.getElementById('dropZone').addEventListener('click', () => {
+                document.getElementById('fileInput').click();
+            });
+
+            document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+
+            document.getElementById('userInput').addEventListener('keypress', (event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            document.getElementById('userInput').addEventListener('keydown', (event) => {
+                if (event.key === 'ArrowUp') {
+                    document.getElementById('userInput').innerText = previousInput;
+                }
+            });
+
+            // Drag and drop handlers
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                document.getElementById('dropZone').addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+            });
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                document.getElementById('dropZone').addEventListener(eventName, () => {
+                    document.getElementById('dropZone').classList.add('dragover');
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                document.getElementById('dropZone').addEventListener(eventName, () => {
+                    document.getElementById('dropZone').classList.remove('dragover');
+                });
+            });
+
+            document.getElementById('dropZone').addEventListener('drop', handleFileSelect);
+        });
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1 class="page-title">LLMChat</h1>
+        
+        <div class="icon">
+            <img src="{{ url_for('static', filename='icon.png') }}" alt="Icon">
+        </div>
+
+        <div class="drop-zone" id="dropZone">
+            <h3>Upload Documents or Code Samples</h3>
+            <p>Drag and drop files here or click to upload</p>
+            <input type="file" id="fileInput" style="display: none;" multiple 
+                   accept=".pdf,.doc,.docx,.txt,.md,.py,.js,.html,.css">
+        </div>
+
+        <div class="chat-container" id="chatContainer"></div>
+
+        <div class="input-container">
+            <div class="input-box" id="userInput" contenteditable="true"></div>
+            <button class="send-button" onclick="sendMessage()">Send</button>
+        </div>
+
+        <div class="button-container">
+            <button class="new-chat-button" onclick="startNewChat()">New Chat</button>
+        </div>
+    </div>
+</body>
+</html>
