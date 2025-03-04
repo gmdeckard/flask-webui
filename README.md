@@ -1,5 +1,5 @@
 # flask-webui
-Very simple WebUI for running on a Flask server to chat with an Ollama server
+Very simple Python WebUI for running on a Flask server to chat with an Ollama server
 
 This is a very simple and light Web UI for chatting with an Ollama server.
 
